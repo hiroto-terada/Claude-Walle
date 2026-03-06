@@ -144,31 +144,32 @@ canvas {
   color: white;
   border-radius: 0 0 12px 12px;
   z-index: 20;
-  padding: 20px;
+  padding: 16px 20px;
   backdrop-filter: blur(2px);
+  overflow: hidden;
 }
 .overlay.hidden { display: none; }
 
 .overlay h1 {
-  font-size: clamp(1.6rem, 5vw, 2.8rem);
-  margin-bottom: 8px;
+  font-size: clamp(1.2rem, 4.5vw, 2.4rem);
+  margin-bottom: 4px;
   color: #00ffcc;
   text-shadow: 0 0 30px rgba(0,255,200,0.6);
   text-align: center;
 }
 .overlay p {
-  font-size: clamp(0.85rem, 2.5vw, 1.05rem);
+  font-size: clamp(0.8rem, 2.5vw, 1rem);
   color: #aaddff;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   text-align: center;
   max-width: 420px;
-  line-height: 1.7;
+  line-height: 1.5;
 }
 
 
 .btn {
-  padding: 13px 42px;
-  font-size: clamp(1rem, 3vw, 1.2rem);
+  padding: 10px 36px;
+  font-size: clamp(0.95rem, 3vw, 1.2rem);
   background: linear-gradient(135deg, #0055bb, #0099ff);
   color: white;
   border: none;
@@ -177,31 +178,31 @@ canvas {
   font-weight: bold;
   box-shadow: 0 4px 18px rgba(0,120,255,0.45);
   transition: transform 0.1s, box-shadow 0.15s;
-  margin: 5px;
+  margin: 4px 0 0;
   letter-spacing: 1px;
 }
 .btn:hover  { transform: scale(1.06); box-shadow: 0 6px 24px rgba(0,150,255,0.65); }
 .btn:active { transform: scale(0.97); }
 
 .result-score {
-  font-size: clamp(2.5rem, 10vw, 4rem);
+  font-size: clamp(1.8rem, 7vw, 3rem);
   font-weight: 900;
   color: #ffcc00;
   text-shadow: 0 0 20px rgba(255,200,0,0.5);
+  line-height: 1.1;
 }
 .result-breakdown {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin: 12px 0;
-  font-size: 0.95rem;
+  gap: 4px;
+  margin: 8px 0;
 }
 .result-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   color: #aaddff;
-  font-size: 1rem;
+  font-size: 0.9rem;
 }
 .result-row.found-yes { color: #00ffaa; }
 .result-row.found-no  { color: #ff6666; opacity: 0.7; }
