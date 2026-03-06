@@ -73,7 +73,7 @@ body {
   opacity: 0.6;
 }
 
-.card-icon { font-size: 22px; line-height: 1.2; }
+.card-thumb { display: block; width: 44px; height: 44px; }
 .card-name { font-weight: bold; font-size: 11px; margin-top: 2px; }
 .card-pts  { color: #ffcc00; font-size: 13px; font-weight: bold; }
 .card-diff { font-size: 10px; color: #99aacc; }
@@ -178,10 +178,10 @@ canvas {
   gap: 4px;
   min-width: 90px;
 }
-.preview-item .big-icon { font-size: 32px; }
-.preview-item .p-name  { font-size: 13px; font-weight: bold; }
-.preview-item .p-pts   { font-size: 14px; color: #ffcc00; font-weight: bold; }
-.preview-item .p-diff  { font-size: 11px; color: #99aacc; }
+.big-thumb { display: block; width: 64px; height: 64px; }
+.p-name  { font-size: 13px; font-weight: bold; }
+.p-pts   { font-size: 14px; color: #ffcc00; font-weight: bold; }
+.p-diff  { font-size: 11px; color: #99aacc; }
 
 .btn {
   padding: 13px 42px;
@@ -229,26 +229,7 @@ canvas {
 
   <!-- HUD -->
   <div id="hud">
-    <div id="target-panel">
-      <div class="target-card" id="card-clownfish">
-        <div class="card-icon">🐠</div>
-        <div class="card-name">クマノミ</div>
-        <div class="card-pts">+20点</div>
-        <div class="card-diff">易しい</div>
-      </div>
-      <div class="target-card" id="card-octopus">
-        <div class="card-icon">🐙</div>
-        <div class="card-name">タコ</div>
-        <div class="card-pts">+30点</div>
-        <div class="card-diff">ふつう</div>
-      </div>
-      <div class="target-card" id="card-chest">
-        <div class="card-icon">📦</div>
-        <div class="card-name">宝箱</div>
-        <div class="card-pts">+50点</div>
-        <div class="card-diff">難しい</div>
-      </div>
-    </div>
+    <div id="target-panel"><!-- built by JS --></div>
     <div id="timer-box">
       <div id="timer-label">のこり時間</div>
       <div id="timer-val">60</div>
@@ -267,26 +248,7 @@ canvas {
     <div class="overlay" id="start-overlay">
       <h1>🌊 海の宝探し 🌊</h1>
       <p>海の中にかくれた3つのものを探してタップ！<br>60秒以内にすべて見つけると100点！</p>
-      <div class="target-preview">
-        <div class="preview-item">
-          <div class="big-icon">🐠</div>
-          <div class="p-name">クマノミ</div>
-          <div class="p-pts">20点</div>
-          <div class="p-diff">易しい</div>
-        </div>
-        <div class="preview-item">
-          <div class="big-icon">🐙</div>
-          <div class="p-name">タコ</div>
-          <div class="p-pts">30点</div>
-          <div class="p-diff">ふつう</div>
-        </div>
-        <div class="preview-item">
-          <div class="big-icon">📦</div>
-          <div class="p-name">宝箱</div>
-          <div class="p-pts">50点</div>
-          <div class="p-diff">難しい</div>
-        </div>
-      </div>
+      <div class="target-preview" id="start-preview"><!-- built by JS --></div>
       <button class="btn" onclick="startGame()">ゲームスタート！</button>
     </div>
 
@@ -295,7 +257,7 @@ canvas {
       <h1 id="end-title"></h1>
       <div class="result-score" id="result-score"></div>
       <div class="result-breakdown" id="result-breakdown"></div>
-      <button class="btn" onclick="startGame()">もう一度！</button>
+      <button class="btn" onclick="showStartOverlay()">もう一度！</button>
     </div>
   </div>
 
@@ -313,19 +275,41 @@ const H = 630;
 canvas.width  = W;
 canvas.height = H;
 
-const SAND_Y  = Math.floor(H * 0.79);   // where sand starts
-const WATER_Y = 0;                       // top of water
+const SAND_Y  = Math.floor(H * 0.79);
+const WATER_Y = 0;
+
+// ─────────────────────────────────────────────
+//  CREATURE POOL  (6 types, 3 picked per game)
+// ─────────────────────────────────────────────
+const CREATURE_POOL = [
+  { id:'clownfish', name:'クマノミ',       pts:20, diff:'易しい', zone:'water',  hitR:28 },
+  { id:'starfish',  name:'ヒトデ',         pts:25, diff:'易しい', zone:'sand',   hitR:22 },
+  { id:'octopus',   name:'タコ',           pts:30, diff:'ふつう', zone:'bottom', hitR:32 },
+  { id:'crab',      name:'カニ',           pts:35, diff:'ふつう', zone:'sand',   hitR:22 },
+  { id:'seahorse',  name:'タツノオトシゴ', pts:40, diff:'難しい', zone:'water',  hitR:18 },
+  { id:'chest',     name:'宝箱',           pts:50, diff:'難しい', zone:'sand',   hitR:22 },
+];
+
+// Scale/offset for centering each creature in thumbnail canvases (base 44×44)
+const THUMB_CFG = {
+  clownfish: { s: 0.68, dy:  0 },
+  starfish:  { s: 0.95, dy:  0 },
+  octopus:   { s: 0.28, dy:  4 },
+  crab:      { s: 0.52, dy:  6 },
+  seahorse:  { s: 0.42, dy:  6 },
+  chest:     { s: 0.90, dy:  4 },
+};
 
 // ─────────────────────────────────────────────
 //  GAME STATE
 // ─────────────────────────────────────────────
-let gameActive   = false;
-let score        = 0;
-let timeLeft     = 60;
+let gameActive    = false;
+let score         = 0;
+let timeLeft      = 60;
 let timerInterval = null;
-let found        = { clownfish: false, octopus: false, chest: false };
-let feedbacks    = [];   // { x, y, text, color, life, maxLife, size }
-let ripples      = [];   // miss-click rings
+let gameTargets   = [];   // [{ ...creature, x, y, found }]
+let feedbacks     = [];
+let ripples       = [];
 
 // ─────────────────────────────────────────────
 //  SCENE OBJECTS
@@ -337,15 +321,6 @@ let bubbles   = [];
 let jellyfish = [];
 
 // ─────────────────────────────────────────────
-//  TARGET POSITIONS  (set randomly each game)
-// ─────────────────────────────────────────────
-const targets = {
-  clownfish: { x: 0, y: 0, r: 26 },
-  octopus:   { x: 0, y: 0, r: 30 },
-  chest:     { x: 0, y: 0, hw: 18, hh: 14 }  // half-width / half-height hitbox
-};
-
-// ─────────────────────────────────────────────
 //  UTILS
 // ─────────────────────────────────────────────
 function rnd(min, max) { return min + Math.random() * (max - min); }
@@ -355,12 +330,22 @@ function dist2(ax, ay, bx, by) {
   return dx * dx + dy * dy;
 }
 
+function pickRandom3() {
+  const pool = [...CREATURE_POOL];
+  const picked = [];
+  while (picked.length < 3) {
+    const i = rndInt(0, pool.length);
+    picked.push({ ...pool[i] });
+    pool.splice(i, 1);
+  }
+  return picked;
+}
+
 // ─────────────────────────────────────────────
 //  SCENE INIT
 // ─────────────────────────────────────────────
 function initScene() {
-
-  // ── Seaweeds ──────────────────────────────
+  // Seaweeds
   seaweeds = [];
   const swColors = ['#1a8a3a','#2aaa4a','#1a6a2a','#0a7a30','#3aba5a','#228b22','#006400'];
   for (let i = 0; i < 42; i++) {
@@ -377,9 +362,8 @@ function initScene() {
     });
   }
 
-  // ── Rocks ─────────────────────────────────
+  // Rocks
   rocks = [];
-  // Some large rocks, some small
   for (let i = 0; i < 28; i++) {
     const g = rndInt(55, 115);
     rocks.push({
@@ -391,7 +375,6 @@ function initScene() {
       color: `rgb(${g},${g},${g + rndInt(5, 20)})`
     });
   }
-  // A few boxy-ish rocks to act as chest decoys
   for (let i = 0; i < 6; i++) {
     const g = rndInt(50, 80);
     rocks.push({
@@ -404,7 +387,7 @@ function initScene() {
     });
   }
 
-  // ── Distractor fish ───────────────────────
+  // Distractor fish
   distFish = [];
   const palettes = [
     ['#FF9966','#FF6633','#FFB399'],
@@ -421,7 +404,6 @@ function initScene() {
   for (let i = 0; i < 28; i++) {
     const pal = palettes[rndInt(0, palettes.length)];
     const dir = Math.random() < 0.5 ? 1 : -1;
-    // avoid placing orange fish in clownfish zone to reduce confusion early
     distFish.push({
       x:        rnd(0, W),
       y:        rnd(WATER_Y + 30, SAND_Y - 40),
@@ -438,31 +420,31 @@ function initScene() {
     });
   }
 
-  // ── Jellyfish ─────────────────────────────
+  // Jellyfish
   jellyfish = [];
   const jfPals = [
-    { inner:'rgba(255,140,200,0.85)', outer:'rgba(200,50,160,0.45)', tent:'rgba(200,90,180,0.65)' },
+    { inner:'rgba(255,140,200,0.85)', outer:'rgba(200,50,160,0.45)',  tent:'rgba(200,90,180,0.65)' },
     { inner:'rgba(130,190,255,0.85)', outer:'rgba(40,100,210,0.45)',  tent:'rgba(90,140,255,0.65)' },
     { inner:'rgba(160,255,190,0.85)', outer:'rgba(40,180,100,0.45)', tent:'rgba(80,200,140,0.65)' },
   ];
   for (let i = 0; i < 7; i++) {
     const p = jfPals[i % jfPals.length];
     jellyfish.push({
-      x:         rnd(40, W - 40),
-      y:         rnd(WATER_Y + 20, SAND_Y * 0.55),
-      size:      rnd(16, 30),
-      pulseSpd:  rnd(1.3, 2.2),
-      pulsePhase:rnd(0, Math.PI * 2),
-      driftSpd:  rnd(0.04, 0.14) * (Math.random() < 0.5 ? 1 : -1),
+      x:          rnd(40, W - 40),
+      y:          rnd(WATER_Y + 20, SAND_Y * 0.55),
+      size:       rnd(16, 30),
+      pulseSpd:   rnd(1.3, 2.2),
+      pulsePhase: rnd(0, Math.PI * 2),
+      driftSpd:   rnd(0.04, 0.14) * (Math.random() < 0.5 ? 1 : -1),
       ...p
     });
   }
 
-  // ── Bubbles ───────────────────────────────
+  // Bubbles
   bubbles = [];
   for (let i = 0; i < 35; i++) bubbles.push(makeBubble());
 
-  // ── Place targets ─────────────────────────
+  // Place targets
   placeTargets();
 }
 
@@ -478,45 +460,40 @@ function makeBubble() {
 }
 
 function placeTargets() {
-  // Clownfish – mid water, anywhere
-  targets.clownfish.x = rnd(80, W - 80);
-  targets.clownfish.y = rnd(WATER_Y + 70, SAND_Y - 120);
-
-  // Octopus – lower portion, near seaweed line
-  targets.octopus.x = rnd(80, W - 80);
-  targets.octopus.y = rnd(SAND_Y - 85, SAND_Y - 35);
-
-  // Chest – in sand, among rocks
-  targets.chest.x = rnd(80, W - 80);
-  targets.chest.y = SAND_Y + rnd(6, 18);
-
-  // Enforce minimum separation between targets
+  for (const gt of gameTargets) {
+    switch (gt.zone) {
+      case 'water':
+        gt.x = rnd(80, W - 80);
+        gt.y = rnd(WATER_Y + 70, SAND_Y - 120);
+        break;
+      case 'bottom':
+        gt.x = rnd(80, W - 80);
+        gt.y = rnd(SAND_Y - 85, SAND_Y - 35);
+        break;
+      case 'sand':
+        gt.x = rnd(80, W - 80);
+        gt.y = SAND_Y + rnd(6, 18);
+        break;
+    }
+  }
+  // Enforce minimum separation
   const minD2 = 130 * 130;
-  const pts = [
-    [targets.clownfish.x, targets.clownfish.y],
-    [targets.octopus.x,   targets.octopus.y],
-    [targets.chest.x,     targets.chest.y]
-  ];
   for (let iter = 0; iter < 10; iter++) {
-    for (let a = 0; a < 3; a++) {
-      for (let b = a + 1; b < 3; b++) {
-        if (dist2(...pts[a], ...pts[b]) < minD2) {
-          pts[b][0] = Math.max(60, Math.min(W - 60, pts[b][0] + 50));
+    for (let a = 0; a < gameTargets.length; a++) {
+      for (let b = a + 1; b < gameTargets.length; b++) {
+        const ga = gameTargets[a], gb = gameTargets[b];
+        if (dist2(ga.x, ga.y, gb.x, gb.y) < minD2) {
+          gb.x = Math.max(60, Math.min(W - 60, gb.x + 50));
         }
       }
     }
   }
-  [targets.clownfish.x, targets.clownfish.y] = pts[0];
-  [targets.octopus.x,   targets.octopus.y  ] = pts[1];
-  [targets.chest.x,     targets.chest.y    ] = pts[2];
 }
 
 // ─────────────────────────────────────────────
-//  DRAWING
+//  DECORATIVE DRAW  (use global ctx)
 // ─────────────────────────────────────────────
-
 function drawBackground() {
-  // Ocean gradient
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0,   '#001a3a');
   g.addColorStop(0.35,'#002860');
@@ -557,7 +534,6 @@ function drawBackground() {
   ctx.closePath();
   ctx.fill();
 
-  // Sand speckles
   ctx.save();
   ctx.globalAlpha = 0.18;
   ctx.fillStyle = '#7a5a20';
@@ -603,22 +579,21 @@ function drawSeaweed(sw) {
   ctx.moveTo(sw.x, sw.baseY);
   for (let i = 1; i <= sw.segs; i++) {
     const ratio = i / sw.segs;
-    const sx = sw.x + sway * ratio * ratio;
-    const sy = sw.baseY - segH * i;
+    const sx  = sw.x + sway * ratio * ratio;
+    const sy  = sw.baseY - segH * i;
     const cpx = sw.x + sway * ratio * ratio * 0.7;
     const cpy = sw.baseY - segH * (i - 0.5);
     ctx.quadraticCurveTo(cpx, cpy, sx, sy);
   }
   ctx.stroke();
 
-  // Small leaf bulges
   ctx.save();
   ctx.globalAlpha = 0.65;
   ctx.fillStyle = sw.color;
   for (let i = 1; i < sw.segs; i++) {
     const ratio = i / sw.segs;
-    const sx = sw.x + sway * ratio * ratio;
-    const sy = sw.baseY - segH * i;
+    const sx   = sw.x + sway * ratio * ratio;
+    const sy   = sw.baseY - segH * i;
     const side = i % 2 === 0 ? 1 : -1;
     ctx.beginPath();
     ctx.ellipse(sx + side * sw.width * 2.2, sy,
@@ -641,7 +616,6 @@ function drawFish(f) {
   ctx.translate(x, y);
   if (f.dir < 0) ctx.scale(-1, 1);
 
-  // Body
   ctx.beginPath();
   ctx.ellipse(0, 0, s, s * 0.58, 0, 0, Math.PI * 2);
   ctx.fillStyle = f.color;
@@ -650,7 +624,6 @@ function drawFish(f) {
   ctx.lineWidth = 0.8;
   ctx.stroke();
 
-  // Tail
   ctx.beginPath();
   ctx.moveTo(-s * 0.78, 0);
   ctx.lineTo(-s * 1.38, -s * 0.52);
@@ -660,7 +633,6 @@ function drawFish(f) {
   ctx.fill();
   ctx.stroke();
 
-  // Dorsal fin
   ctx.beginPath();
   ctx.moveTo(-s * 0.1, -s * 0.58);
   ctx.lineTo( s * 0.28, -s * 0.92);
@@ -669,7 +641,6 @@ function drawFish(f) {
   ctx.fillStyle = f.finCol;
   ctx.fill();
 
-  // Eye
   ctx.beginPath();
   ctx.arc(s * 0.42, -s * 0.1, s * 0.13, 0, Math.PI * 2);
   ctx.fillStyle = 'white';
@@ -679,7 +650,6 @@ function drawFish(f) {
   ctx.fillStyle = '#111';
   ctx.fill();
 
-  // Optional stripe
   if (f.stripe) {
     ctx.strokeStyle = f.stripe;
     ctx.lineWidth   = s * 0.11;
@@ -688,233 +658,6 @@ function drawFish(f) {
     ctx.lineTo(s * 0.13,  s * 0.58);
     ctx.stroke();
   }
-
-  ctx.restore();
-}
-
-function drawClownfish(pos, foundFlag) {
-  const s = 26;
-  ctx.save();
-  ctx.translate(pos.x, pos.y);
-
-  // Orange body
-  ctx.beginPath();
-  ctx.ellipse(0, 0, s, s * 0.6, 0, 0, Math.PI * 2);
-  ctx.fillStyle = '#FF6820';
-  ctx.fill();
-  ctx.strokeStyle = '#BB3300';
-  ctx.lineWidth   = 1.8;
-  ctx.stroke();
-
-  // White bands (clown pattern)
-  ctx.fillStyle   = 'white';
-  ctx.strokeStyle = '#BB3300';
-  ctx.lineWidth   = 0.9;
-  for (const bx of [s * 0.22, -s * 0.22]) {
-    ctx.beginPath();
-    ctx.ellipse(bx, 0, s * 0.115, s * 0.61, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-  }
-
-  // Tail
-  ctx.beginPath();
-  ctx.moveTo(-s * 0.78, 0);
-  ctx.lineTo(-s * 1.38, -s * 0.55);
-  ctx.lineTo(-s * 1.38,  s * 0.55);
-  ctx.closePath();
-  ctx.fillStyle   = '#FF6820';
-  ctx.fill();
-  ctx.strokeStyle = '#BB3300';
-  ctx.stroke();
-
-  // Dorsal fin
-  ctx.beginPath();
-  ctx.moveTo(-s * 0.05, -s * 0.6);
-  ctx.lineTo( s * 0.3,  -s * 0.95);
-  ctx.lineTo( s * 0.55, -s * 0.6);
-  ctx.closePath();
-  ctx.fillStyle = '#FF8844';
-  ctx.fill();
-  ctx.strokeStyle = '#BB3300';
-  ctx.stroke();
-
-  // Eye
-  ctx.beginPath();
-  ctx.arc(s * 0.5, -s * 0.1, s * 0.15, 0, Math.PI * 2);
-  ctx.fillStyle = 'white';
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(s * 0.52, -s * 0.1, s * 0.08, 0, Math.PI * 2);
-  ctx.fillStyle = '#111';
-  ctx.fill();
-
-  ctx.restore();
-
-  if (foundFlag) drawFoundRing(pos.x, pos.y, s + 12);
-}
-
-function drawOctopus(pos, foundFlag) {
-  const t  = performance.now() * 0.001;
-  const hr = 24;   // head radius
-
-  ctx.save();
-  ctx.translate(pos.x, pos.y);
-
-  // Tentacles (8)
-  for (let i = 0; i < 8; i++) {
-    const angle = (i / 8) * Math.PI * 2 + Math.PI * 0.5;
-    const wave  = Math.sin(t * 2.1 + i * 0.85) * 9;
-    const bx    = Math.cos(angle) * hr * 0.55;
-    const by    = Math.sin(angle) * hr * 0.5;
-    const ex    = Math.cos(angle) * hr * 3.1 + wave;
-    const ey    = Math.sin(angle) * hr * 2.7;
-    ctx.beginPath();
-    ctx.moveTo(bx, by);
-    ctx.bezierCurveTo(
-      bx + wave * 0.6, by + (ey - by) * 0.4,
-      ex - wave * 0.4, by + (ey - by) * 0.7,
-      ex, ey
-    );
-    ctx.strokeStyle = '#6a3a90';
-    ctx.lineWidth   = 4.5;
-    ctx.lineCap     = 'round';
-    ctx.stroke();
-    // Sucker
-    ctx.beginPath();
-    ctx.arc(bx + (ex - bx) * 0.65 + wave * 0.4,
-            by + (ey - by) * 0.65, 2.8, 0, Math.PI * 2);
-    ctx.fillStyle = '#cc99ee';
-    ctx.fill();
-  }
-
-  // Head
-  ctx.beginPath();
-  ctx.ellipse(0, 0, hr, hr * 1.12, 0, 0, Math.PI * 2);
-  ctx.fillStyle = '#9b5fbf';
-  ctx.fill();
-  ctx.strokeStyle = '#6a3a90';
-  ctx.lineWidth   = 2;
-  ctx.stroke();
-
-  // Texture spots
-  ctx.globalAlpha = 0.28;
-  ctx.fillStyle   = '#fff';
-  const spots = [[-8,-6],[5,-9],[10,3],[-4,7],[0,-1]];
-  for (const [sx, sy] of spots) {
-    ctx.beginPath();
-    ctx.arc(sx, sy, 2.8, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.globalAlpha = 1;
-
-  // Eyes
-  for (const ex of [-hr * 0.38, hr * 0.38]) {
-    ctx.beginPath();
-    ctx.arc(ex, -hr * 0.18, 6.5, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffe56a';
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(ex + 1, -hr * 0.18, 3.5, 0, Math.PI * 2);
-    ctx.fillStyle = '#222';
-    ctx.fill();
-  }
-
-  ctx.restore();
-  if (foundFlag) drawFoundRing(pos.x, pos.y, hr + 14);
-}
-
-function drawChest(pos, foundFlag) {
-  // Small, dark, partially buried – intentionally hard to see
-  const w = 34, h = 26;
-  const buried = h * 0.38;
-
-  ctx.save();
-  ctx.translate(pos.x, pos.y);
-
-  // Body (below lid)
-  ctx.beginPath();
-  roundRect(ctx, -w / 2, -h / 2 + buried * 0.3, w, h - buried + 4, 3);
-  ctx.fillStyle = '#7a4e20';
-  ctx.fill();
-  ctx.strokeStyle = '#4a2a08';
-  ctx.lineWidth   = 1.8;
-  ctx.stroke();
-
-  // Lid (slightly ajar)
-  ctx.save();
-  ctx.rotate(-0.18);
-  ctx.beginPath();
-  roundRect(ctx, -w / 2, -h / 2 - h * 0.38, w, h * 0.48, [3, 3, 0, 0]);
-  ctx.fillStyle   = '#9a6230';
-  ctx.fill();
-  ctx.strokeStyle = '#4a2a08';
-  ctx.stroke();
-  ctx.restore();
-
-  // Metal bands
-  ctx.strokeStyle = '#c89800';
-  ctx.lineWidth   = 2.5;
-  for (const bx of [-w * 0.26, 0, w * 0.26]) {
-    ctx.beginPath();
-    ctx.moveTo(bx, -h / 2 + buried * 0.3);
-    ctx.lineTo(bx,  h / 2 - buried + 4);
-    ctx.stroke();
-  }
-
-  // Lock
-  ctx.fillStyle   = '#ffd700';
-  ctx.strokeStyle = '#b89000';
-  ctx.lineWidth   = 1.2;
-  ctx.beginPath();
-  ctx.arc(0, -h * 0.06, 5, 0, Math.PI * 2);
-  ctx.fill(); ctx.stroke();
-
-  // Glow from lid gap (subtle hint)
-  if (!foundFlag && gameActive) {
-    ctx.save();
-    ctx.globalAlpha = 0.22;
-    const gl = ctx.createRadialGradient(0, -h * 0.4, 0, 0, -h * 0.4, w * 0.7);
-    gl.addColorStop(0, '#ffdd44');
-    gl.addColorStop(1, 'transparent');
-    ctx.fillStyle = gl;
-    ctx.beginPath();
-    ctx.arc(0, -h * 0.4, w * 0.7, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  ctx.restore();
-  if (foundFlag) drawFoundRing(pos.x, pos.y - 4, 26);
-}
-
-function roundRect(ctx, x, y, w, h, r) {
-  if (typeof r === 'number') r = [r, r, r, r];
-  const [tl, tr, br, bl] = r;
-  ctx.beginPath();
-  ctx.moveTo(x + tl, y);
-  ctx.lineTo(x + w - tr, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + tr);
-  ctx.lineTo(x + w, y + h - br);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - br, y + h);
-  ctx.lineTo(x + bl, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - bl);
-  ctx.lineTo(x, y + tl);
-  ctx.quadraticCurveTo(x, y, x + tl, y);
-  ctx.closePath();
-}
-
-function drawFoundRing(x, y, r) {
-  const t = performance.now() * 0.001;
-  const pulse = (Math.sin(t * 5) + 1) / 2;
-  ctx.save();
-  ctx.strokeStyle = `rgba(0, 255, 140, ${0.5 + pulse * 0.45})`;
-  ctx.lineWidth   = 3;
-  ctx.setLineDash([7, 5]);
-  ctx.beginPath();
-  ctx.arc(x, y, r + 4 + pulse * 6, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.setLineDash([]);
   ctx.restore();
 }
 
@@ -943,7 +686,6 @@ function drawJellyfish(jf) {
   ctx.translate(jf.x, jf.y);
   ctx.globalAlpha = 0.72;
 
-  // Bell
   const bg = ctx.createRadialGradient(0, -bh * 0.3, 0, 0, 0, bw);
   bg.addColorStop(0, jf.inner);
   bg.addColorStop(1, jf.outer);
@@ -952,7 +694,6 @@ function drawJellyfish(jf) {
   ctx.ellipse(0, 0, bw, bh, 0, Math.PI, Math.PI * 2);
   ctx.fill();
 
-  // Tentacles
   for (let i = 0; i < 6; i++) {
     const tx   = (-0.5 + i / 5) * bw;
     const wave = Math.sin(t * 1.6 + i + jf.pulsePhase) * 10;
@@ -966,6 +707,475 @@ function drawJellyfish(jf) {
   ctx.restore();
 }
 
+// ─────────────────────────────────────────────
+//  TARGET CREATURE DRAW FUNCTIONS  (c, x, y, t, found)
+//  These accept any canvas context so thumbnails can reuse them.
+// ─────────────────────────────────────────────
+function roundRect(c, x, y, w, h, r) {
+  if (typeof r === 'number') r = [r, r, r, r];
+  const [tl, tr, br, bl] = r;
+  c.beginPath();
+  c.moveTo(x + tl, y);
+  c.lineTo(x + w - tr, y);
+  c.quadraticCurveTo(x + w, y, x + w, y + tr);
+  c.lineTo(x + w, y + h - br);
+  c.quadraticCurveTo(x + w, y + h, x + w - br, y + h);
+  c.lineTo(x + bl, y + h);
+  c.quadraticCurveTo(x, y + h, x, y + h - bl);
+  c.lineTo(x, y + tl);
+  c.quadraticCurveTo(x, y, x + tl, y);
+  c.closePath();
+}
+
+function drawFoundRing(c, x, y, r, t) {
+  const pulse = (Math.sin(t * 5) + 1) / 2;
+  c.save();
+  c.strokeStyle = `rgba(0, 255, 140, ${0.5 + pulse * 0.45})`;
+  c.lineWidth   = 3;
+  c.setLineDash([7, 5]);
+  c.beginPath();
+  c.arc(x, y, r + 4 + pulse * 6, 0, Math.PI * 2);
+  c.stroke();
+  c.setLineDash([]);
+  c.restore();
+}
+
+function drawClownfish(c, x, y, t, foundFlag) {
+  const s        = 26;
+  const finWave  = Math.sin(t * 6) * 0.08;
+  c.save();
+  c.translate(x, y);
+
+  // Body
+  c.beginPath();
+  c.ellipse(0, 0, s, s * 0.6, 0, 0, Math.PI * 2);
+  c.fillStyle = '#FF6820';
+  c.fill();
+  c.strokeStyle = '#BB3300';
+  c.lineWidth   = 1.8;
+  c.stroke();
+
+  // White bands
+  c.fillStyle   = 'white';
+  c.strokeStyle = '#BB3300';
+  c.lineWidth   = 0.9;
+  for (const bx of [s * 0.22, -s * 0.22]) {
+    c.beginPath();
+    c.ellipse(bx, 0, s * 0.115, s * 0.61, 0, 0, Math.PI * 2);
+    c.fill();
+    c.stroke();
+  }
+
+  // Tail
+  c.beginPath();
+  c.moveTo(-s * 0.78, 0);
+  c.lineTo(-s * 1.38, -s * 0.55);
+  c.lineTo(-s * 1.38,  s * 0.55);
+  c.closePath();
+  c.fillStyle   = '#FF6820';
+  c.fill();
+  c.strokeStyle = '#BB3300';
+  c.stroke();
+
+  // Dorsal fin (slight waggle)
+  c.save();
+  c.rotate(finWave);
+  c.beginPath();
+  c.moveTo(-s * 0.05, -s * 0.6);
+  c.lineTo( s * 0.3,  -s * 0.95);
+  c.lineTo( s * 0.55, -s * 0.6);
+  c.closePath();
+  c.fillStyle   = '#FF8844';
+  c.fill();
+  c.strokeStyle = '#BB3300';
+  c.stroke();
+  c.restore();
+
+  // Eye
+  c.beginPath();
+  c.arc(s * 0.5, -s * 0.1, s * 0.15, 0, Math.PI * 2);
+  c.fillStyle = 'white';
+  c.fill();
+  c.beginPath();
+  c.arc(s * 0.52, -s * 0.1, s * 0.08, 0, Math.PI * 2);
+  c.fillStyle = '#111';
+  c.fill();
+
+  c.restore();
+  if (foundFlag) drawFoundRing(c, x, y, s + 12, t);
+}
+
+function drawOctopus(c, x, y, t, foundFlag) {
+  const hr = 24;
+  c.save();
+  c.translate(x, y);
+
+  // Tentacles (8)
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2 + Math.PI * 0.5;
+    const wave  = Math.sin(t * 2.1 + i * 0.85) * 9;
+    const bx    = Math.cos(angle) * hr * 0.55;
+    const by    = Math.sin(angle) * hr * 0.5;
+    const ex    = Math.cos(angle) * hr * 3.1 + wave;
+    const ey    = Math.sin(angle) * hr * 2.7;
+    c.beginPath();
+    c.moveTo(bx, by);
+    c.bezierCurveTo(
+      bx + wave * 0.6, by + (ey - by) * 0.4,
+      ex - wave * 0.4, by + (ey - by) * 0.7,
+      ex, ey
+    );
+    c.strokeStyle = '#6a3a90';
+    c.lineWidth   = 4.5;
+    c.lineCap     = 'round';
+    c.stroke();
+    c.beginPath();
+    c.arc(bx + (ex - bx) * 0.65 + wave * 0.4,
+          by + (ey - by) * 0.65, 2.8, 0, Math.PI * 2);
+    c.fillStyle = '#cc99ee';
+    c.fill();
+  }
+
+  // Head
+  c.beginPath();
+  c.ellipse(0, 0, hr, hr * 1.12, 0, 0, Math.PI * 2);
+  c.fillStyle = '#9b5fbf';
+  c.fill();
+  c.strokeStyle = '#6a3a90';
+  c.lineWidth   = 2;
+  c.stroke();
+
+  c.globalAlpha = 0.28;
+  c.fillStyle   = '#fff';
+  for (const [sx, sy] of [[-8,-6],[5,-9],[10,3],[-4,7],[0,-1]]) {
+    c.beginPath();
+    c.arc(sx, sy, 2.8, 0, Math.PI * 2);
+    c.fill();
+  }
+  c.globalAlpha = 1;
+
+  // Eyes
+  for (const ex of [-hr * 0.38, hr * 0.38]) {
+    c.beginPath();
+    c.arc(ex, -hr * 0.18, 6.5, 0, Math.PI * 2);
+    c.fillStyle = '#ffe56a';
+    c.fill();
+    c.beginPath();
+    c.arc(ex + 1, -hr * 0.18, 3.5, 0, Math.PI * 2);
+    c.fillStyle = '#222';
+    c.fill();
+  }
+
+  c.restore();
+  if (foundFlag) drawFoundRing(c, x, y, hr + 14, t);
+}
+
+function drawChest(c, x, y, t, foundFlag) {
+  const w      = 34, h = 26;
+  const buried = h * 0.38;
+
+  c.save();
+  c.translate(x, y);
+
+  // Body
+  c.beginPath();
+  roundRect(c, -w / 2, -h / 2 + buried * 0.3, w, h - buried + 4, 3);
+  c.fillStyle = '#7a4e20';
+  c.fill();
+  c.strokeStyle = '#4a2a08';
+  c.lineWidth   = 1.8;
+  c.stroke();
+
+  // Lid
+  c.save();
+  c.rotate(-0.18);
+  c.beginPath();
+  roundRect(c, -w / 2, -h / 2 - h * 0.38, w, h * 0.48, [3, 3, 0, 0]);
+  c.fillStyle   = '#9a6230';
+  c.fill();
+  c.strokeStyle = '#4a2a08';
+  c.stroke();
+  c.restore();
+
+  // Metal bands
+  c.strokeStyle = '#c89800';
+  c.lineWidth   = 2.5;
+  for (const bx of [-w * 0.26, 0, w * 0.26]) {
+    c.beginPath();
+    c.moveTo(bx, -h / 2 + buried * 0.3);
+    c.lineTo(bx,  h / 2 - buried + 4);
+    c.stroke();
+  }
+
+  // Lock
+  c.fillStyle   = '#ffd700';
+  c.strokeStyle = '#b89000';
+  c.lineWidth   = 1.2;
+  c.beginPath();
+  c.arc(0, -h * 0.06, 5, 0, Math.PI * 2);
+  c.fill(); c.stroke();
+
+  // Glow hint (shown until found)
+  if (!foundFlag) {
+    c.save();
+    c.globalAlpha = 0.22;
+    const gl = c.createRadialGradient(0, -h * 0.4, 0, 0, -h * 0.4, w * 0.7);
+    gl.addColorStop(0, '#ffdd44');
+    gl.addColorStop(1, 'transparent');
+    c.fillStyle = gl;
+    c.beginPath();
+    c.arc(0, -h * 0.4, w * 0.7, 0, Math.PI * 2);
+    c.fill();
+    c.restore();
+  }
+
+  c.restore();
+  if (foundFlag) drawFoundRing(c, x, y - 4, 26, t);
+}
+
+function drawStarfish(c, x, y, t, foundFlag) {
+  const s   = 20;
+  const rot = t * 0.25;
+  c.save();
+  c.translate(x, y);
+  c.rotate(rot);
+
+  // 5-pointed star
+  c.beginPath();
+  for (let i = 0; i < 5; i++) {
+    const oa = (i / 5) * Math.PI * 2 - Math.PI / 2;
+    const ia = oa + Math.PI / 5;
+    const ox = Math.cos(oa) * s,       oy = Math.sin(oa) * s;
+    const ix = Math.cos(ia) * s * 0.42, iy = Math.sin(ia) * s * 0.42;
+    if (i === 0) c.moveTo(ox, oy); else c.lineTo(ox, oy);
+    c.lineTo(ix, iy);
+  }
+  c.closePath();
+  c.fillStyle = '#e8632a';
+  c.fill();
+  c.strokeStyle = '#c04010';
+  c.lineWidth = 1.5;
+  c.stroke();
+
+  // Arm texture dots
+  c.fillStyle   = '#ff9966';
+  c.globalAlpha = 0.6;
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2 - Math.PI / 2;
+    c.beginPath();
+    c.arc(Math.cos(a) * s * 0.55, Math.sin(a) * s * 0.55, 2.8, 0, Math.PI * 2);
+    c.fill();
+  }
+  c.globalAlpha = 1;
+
+  // Center disc
+  c.beginPath();
+  c.arc(0, 0, s * 0.28, 0, Math.PI * 2);
+  c.fillStyle = '#ff7744';
+  c.fill();
+
+  c.restore();
+  if (foundFlag) drawFoundRing(c, x, y, s + 8, t);
+}
+
+function drawCrab(c, x, y, t, foundFlag) {
+  const w = 22;
+  c.save();
+  c.translate(x, y);
+
+  // Legs (3 each side, drawn behind body)
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 3; i++) {
+      const legWave = Math.sin(t * 5 + i * 0.9) * 3 * side;
+      c.beginPath();
+      c.moveTo(side * w * 0.45, -w * 0.15 + i * w * 0.32);
+      c.lineTo(side * w * 0.9 + legWave * 1.8, -w * 0.15 + i * w * 0.32 + w * 0.38);
+      c.strokeStyle = '#bb2f0e';
+      c.lineWidth   = 2.8;
+      c.lineCap     = 'round';
+      c.stroke();
+    }
+  }
+
+  // Claws
+  for (const side of [-1, 1]) {
+    const clawWave = Math.sin(t * 2.5) * 0.12 * side;
+    c.save();
+    c.translate(side * w * 0.9, -w * 0.1);
+    c.rotate(clawWave);
+    c.beginPath();
+    c.moveTo(0, 0);
+    c.lineTo(side * w * 0.85, -w * 0.38);
+    c.strokeStyle = '#cc3310';
+    c.lineWidth   = 5.5;
+    c.lineCap     = 'round';
+    c.stroke();
+    c.beginPath();
+    c.ellipse(side * w * 0.85, -w * 0.38, 8, 6, side * 0.4, 0, Math.PI * 2);
+    c.fillStyle   = '#dd4422';
+    c.fill();
+    c.strokeStyle = '#991100';
+    c.lineWidth   = 1.5;
+    c.stroke();
+    c.restore();
+  }
+
+  // Body
+  c.beginPath();
+  c.ellipse(0, 0, w, w * 0.65, 0, 0, Math.PI * 2);
+  c.fillStyle = '#cc3310';
+  c.fill();
+  c.strokeStyle = '#991100';
+  c.lineWidth   = 1.8;
+  c.stroke();
+
+  // Shell rings
+  c.strokeStyle = 'rgba(0,0,0,0.15)';
+  c.lineWidth = 1;
+  c.beginPath(); c.ellipse(0, 0, w * 0.6, w * 0.42, 0, 0, Math.PI * 2); c.stroke();
+  c.beginPath(); c.ellipse(0, 0, w * 0.25, w * 0.2, 0, 0, Math.PI * 2); c.stroke();
+
+  // Eye stalks + eyes
+  for (const side of [-1, 1]) {
+    c.beginPath();
+    c.moveTo(side * w * 0.28, -w * 0.65);
+    c.lineTo(side * w * 0.36, -w * 0.92);
+    c.strokeStyle = '#991100';
+    c.lineWidth   = 2.2;
+    c.stroke();
+    c.beginPath();
+    c.arc(side * w * 0.36, -w * 0.92, 4.5, 0, Math.PI * 2);
+    c.fillStyle = 'white';
+    c.fill();
+    c.beginPath();
+    c.arc(side * w * 0.37, -w * 0.92, 2.5, 0, Math.PI * 2);
+    c.fillStyle = '#111';
+    c.fill();
+  }
+
+  c.restore();
+  if (foundFlag) drawFoundRing(c, x, y, w + 10, t);
+}
+
+function drawSeahorse(c, x, y, t, foundFlag) {
+  const s    = 16;
+  const sway = Math.sin(t * 1.8) * 3;
+  c.save();
+  c.translate(x + sway, y);
+
+  // Tail curl
+  c.beginPath();
+  c.moveTo(s * 0.1, s * 1.0);
+  c.bezierCurveTo(
+    s * 0.9, s * 1.7,
+    s * 1.0, s * 2.4,
+    s * 0.1, s * 2.8
+  );
+  c.strokeStyle = '#c89820';
+  c.lineWidth   = 7;
+  c.lineCap     = 'round';
+  c.lineJoin    = 'round';
+  c.stroke();
+
+  // Body
+  c.beginPath();
+  c.ellipse(0, s * 0.3, s * 0.52, s * 0.95, 0, 0, Math.PI * 2);
+  c.fillStyle = '#e8c030';
+  c.fill();
+  c.strokeStyle = '#b09020';
+  c.lineWidth   = 1.5;
+  c.stroke();
+
+  // Body ridges
+  c.strokeStyle = '#b09020';
+  c.lineWidth   = 1.2;
+  for (let i = 0; i < 4; i++) {
+    const ry = -s * 0.3 + i * s * 0.32;
+    c.beginPath();
+    c.moveTo(-s * 0.48, ry);
+    c.lineTo( s * 0.48, ry);
+    c.stroke();
+  }
+
+  // Dorsal fin (vibrating)
+  const finWave = Math.sin(t * 9) * 3;
+  c.beginPath();
+  c.moveTo(-s * 0.5, -s * 0.25);
+  c.bezierCurveTo(-s * 1.0 + finWave, -s * 0.55, -s * 0.95 - finWave, -s * 0.1, -s * 0.5, s * 0.2);
+  c.fillStyle = 'rgba(240,195,40,0.55)';
+  c.fill();
+
+  // Neck
+  c.beginPath();
+  c.moveTo(-s * 0.05, -s * 0.55);
+  c.lineTo(-s * 0.05, -s * 0.15);
+  c.strokeStyle = '#d4a820';
+  c.lineWidth   = 10;
+  c.lineCap     = 'round';
+  c.stroke();
+
+  // Head
+  c.beginPath();
+  c.ellipse(s * 0.05, -s * 0.78, s * 0.38, s * 0.35, 0.25, 0, Math.PI * 2);
+  c.fillStyle = '#e8c030';
+  c.fill();
+  c.strokeStyle = '#b09020';
+  c.lineWidth   = 1.5;
+  c.stroke();
+
+  // Snout
+  c.beginPath();
+  c.moveTo(s * 0.38, -s * 0.82);
+  c.lineTo(s * 1.05, -s * 0.78);
+  c.strokeStyle = '#d4a820';
+  c.lineWidth   = 5;
+  c.lineCap     = 'round';
+  c.stroke();
+
+  // Eye
+  c.beginPath();
+  c.arc(s * 0.08, -s * 0.92, 3.8, 0, Math.PI * 2);
+  c.fillStyle = 'white';
+  c.fill();
+  c.beginPath();
+  c.arc(s * 0.1, -s * 0.92, 2.1, 0, Math.PI * 2);
+  c.fillStyle = '#222';
+  c.fill();
+
+  c.restore();
+  if (foundFlag) drawFoundRing(c, x, y - s * 0.3, s + 14, t);
+}
+
+// Dispatch by creature id
+function drawCreatureAt(id, c, x, y, t, foundFlag) {
+  switch (id) {
+    case 'clownfish': drawClownfish(c, x, y, t, foundFlag); break;
+    case 'octopus':   drawOctopus(c, x, y, t, foundFlag);   break;
+    case 'chest':     drawChest(c, x, y, t, foundFlag);     break;
+    case 'starfish':  drawStarfish(c, x, y, t, foundFlag);  break;
+    case 'crab':      drawCrab(c, x, y, t, foundFlag);      break;
+    case 'seahorse':  drawSeahorse(c, x, y, t, foundFlag);  break;
+  }
+}
+
+// Draw static thumbnail onto a <canvas> element.
+// The same draw functions are used here, so thumbnail always matches the game.
+function drawThumbnail(id, thumbCanvas) {
+  const tc      = thumbCanvas.getContext('2d');
+  const size    = thumbCanvas.width;
+  const cfg     = THUMB_CFG[id] || { s: 0.8, dy: 0 };
+  const ratio   = size / 44;  // scale proportionally for 44 vs 64 base
+  tc.clearRect(0, 0, size, size);
+  tc.save();
+  tc.translate(size / 2, size / 2 + cfg.dy * ratio);
+  tc.scale(cfg.s * ratio, cfg.s * ratio);
+  drawCreatureAt(id, tc, 0, 0, 0, false);
+  tc.restore();
+}
+
+// ─────────────────────────────────────────────
+//  FEEDBACK / RIPPLE DRAW
+// ─────────────────────────────────────────────
 function drawFeedbacks() {
   for (let i = feedbacks.length - 1; i >= 0; i--) {
     const f   = feedbacks[i];
@@ -991,9 +1201,9 @@ function drawRipples() {
     const r = ripples[i];
     const p = 1 - r.life / r.maxLife;
     ctx.save();
-    ctx.globalAlpha  = (1 - p) * 0.55;
-    ctx.strokeStyle  = 'rgba(255, 80, 80, 0.9)';
-    ctx.lineWidth    = 1.8;
+    ctx.globalAlpha = (1 - p) * 0.55;
+    ctx.strokeStyle = 'rgba(255, 80, 80, 0.9)';
+    ctx.lineWidth   = 1.8;
     ctx.beginPath();
     ctx.arc(r.x, r.y, p * 34, 0, Math.PI * 2);
     ctx.stroke();
@@ -1007,14 +1217,11 @@ function drawRipples() {
 //  UPDATE
 // ─────────────────────────────────────────────
 function update() {
-  // Fish movement
   for (const f of distFish) {
     f.x += f.speed;
     if (f.x > W + 55) { f.x = -55; f.y = rnd(WATER_Y + 30, SAND_Y - 45); }
     if (f.x < -55)    { f.x = W + 55; f.y = rnd(WATER_Y + 30, SAND_Y - 45); }
   }
-
-  // Bubbles
   for (let i = 0; i < bubbles.length; i++) {
     const b = bubbles[i];
     b.y -= b.spd;
@@ -1024,8 +1231,6 @@ function update() {
       bubbles[i].y = SAND_Y - rnd(5, 25);
     }
   }
-
-  // Jellyfish drift
   for (const jf of jellyfish) {
     jf.x += jf.driftSpd;
     if (jf.x > W + 55) jf.x = -55;
@@ -1039,33 +1244,23 @@ function update() {
 function render() {
   ctx.clearRect(0, 0, W, H);
   drawBackground();
-
-  // Rocks (behind seaweed)
-  for (const r of rocks) drawRock(r);
-
-  // Seaweed
+  for (const r of rocks)     drawRock(r);
   for (const sw of seaweeds) drawSeaweed(sw);
-
-  // Jellyfish
   for (const jf of jellyfish) drawJellyfish(jf);
+  for (const f of distFish)  drawFish(f);
 
-  // Distractor fish
-  for (const f of distFish) drawFish(f);
+  const t = performance.now() * 0.001;
 
-  // ── Targets ──────────────────────────────
-  // Chest is on sand, draw first (behind fish & seaweed visually)
-  drawChest(targets.chest, found.chest);
+  // Draw targets in depth order: sand first, then bottom, then water
+  for (const zone of ['sand', 'bottom', 'water']) {
+    for (const gt of gameTargets) {
+      if (gt.zone === zone) {
+        drawCreatureAt(gt.id, ctx, gt.x, gt.y, t, gt.found);
+      }
+    }
+  }
 
-  // Octopus near bottom
-  drawOctopus(targets.octopus, found.octopus);
-
-  // Clownfish in open water (drawn last so it's on top of distractors)
-  drawClownfish(targets.clownfish, found.clownfish);
-
-  // Bubbles (front layer)
   for (const b of bubbles) drawBubble(b);
-
-  // Feedback
   drawRipples();
   drawFeedbacks();
 }
@@ -1080,21 +1275,111 @@ function gameLoop() {
 }
 
 // ─────────────────────────────────────────────
+//  UI BUILDERS
+// ─────────────────────────────────────────────
+function buildHUD() {
+  const panel = document.getElementById('target-panel');
+  panel.innerHTML = '';
+  for (let i = 0; i < gameTargets.length; i++) {
+    const gt = gameTargets[i];
+
+    const card = document.createElement('div');
+    card.className = 'target-card';
+    card.id        = 'card-' + i;
+
+    const thumbC = document.createElement('canvas');
+    thumbC.className = 'card-thumb';
+    thumbC.width     = 44;
+    thumbC.height    = 44;
+
+    const nameDiv = document.createElement('div');
+    nameDiv.className   = 'card-name';
+    nameDiv.textContent = gt.name;
+
+    const ptsDiv = document.createElement('div');
+    ptsDiv.className   = 'card-pts';
+    ptsDiv.textContent = `+${gt.pts}点`;
+
+    const diffDiv = document.createElement('div');
+    diffDiv.className   = 'card-diff';
+    diffDiv.textContent = gt.diff;
+
+    card.appendChild(thumbC);
+    card.appendChild(nameDiv);
+    card.appendChild(ptsDiv);
+    card.appendChild(diffDiv);
+    panel.appendChild(card);
+
+    drawThumbnail(gt.id, thumbC);
+  }
+}
+
+function buildStartPreview() {
+  const preview = document.getElementById('start-preview');
+  preview.innerHTML = '';
+  for (const gt of gameTargets) {
+    const item = document.createElement('div');
+    item.className = 'preview-item';
+
+    const thumbC = document.createElement('canvas');
+    thumbC.className = 'big-thumb';
+    thumbC.width     = 64;
+    thumbC.height    = 64;
+
+    const nameDiv = document.createElement('div');
+    nameDiv.className   = 'p-name';
+    nameDiv.textContent = gt.name;
+
+    const ptsDiv = document.createElement('div');
+    ptsDiv.className   = 'p-pts';
+    ptsDiv.textContent = gt.pts + '点';
+
+    const diffDiv = document.createElement('div');
+    diffDiv.className   = 'p-diff';
+    diffDiv.textContent = gt.diff;
+
+    item.appendChild(thumbC);
+    item.appendChild(nameDiv);
+    item.appendChild(ptsDiv);
+    item.appendChild(diffDiv);
+    preview.appendChild(item);
+
+    drawThumbnail(gt.id, thumbC);
+  }
+}
+
+// ─────────────────────────────────────────────
 //  GAME CONTROL
 // ─────────────────────────────────────────────
+
+// Pick new random targets and show the start overlay
+function showStartOverlay() {
+  gameActive = false;
+  if (timerInterval) clearInterval(timerInterval);
+
+  gameTargets = pickRandom3().map(c => ({ ...c, found: false, x: 0, y: 0 }));
+  buildHUD();
+  buildStartPreview();
+
+  document.getElementById('start-overlay').classList.remove('hidden');
+  document.getElementById('end-overlay').classList.add('hidden');
+}
+
+// Start playing with the currently selected targets
 function startGame() {
   score     = 0;
   timeLeft  = 60;
-  found     = { clownfish: false, octopus: false, chest: false };
   feedbacks = [];
   ripples   = [];
 
+  for (let i = 0; i < gameTargets.length; i++) {
+    gameTargets[i].found = false;
+    const card = document.getElementById('card-' + i);
+    if (card) card.classList.remove('found');
+  }
+
   updateScoreUI();
   updateTimerUI();
-  document.getElementById('card-clownfish').classList.remove('found');
-  document.getElementById('card-octopus').classList.remove('found');
-  document.getElementById('card-chest').classList.remove('found');
-
   initScene();
 
   document.getElementById('start-overlay').classList.add('hidden');
@@ -1113,7 +1398,7 @@ function endGame() {
   gameActive = false;
   if (timerInterval) clearInterval(timerInterval);
 
-  const allFound = found.clownfish && found.octopus && found.chest;
+  const allFound = gameTargets.every(gt => gt.found);
   document.getElementById('end-title').textContent =
     allFound ? '全部見つけた！🎉' : 'タイムアップ！⏰';
 
@@ -1121,17 +1406,12 @@ function endGame() {
 
   const bd = document.getElementById('result-breakdown');
   bd.innerHTML = '';
-  const rows = [
-    { key:'clownfish', label:'クマノミ', icon:'🐠', pts: 20 },
-    { key:'octopus',   label:'タコ',     icon:'🐙', pts: 30 },
-    { key:'chest',     label:'宝箱',     icon:'📦', pts: 50 },
-  ];
-  for (const row of rows) {
+  for (const gt of gameTargets) {
     const div = document.createElement('div');
-    div.className = 'result-row ' + (found[row.key] ? 'found-yes' : 'found-no');
-    div.textContent = found[row.key]
-      ? `${row.icon} ${row.label}：+${row.pts}点 ✓`
-      : `${row.icon} ${row.label}：見つからなかった…`;
+    div.className = 'result-row ' + (gt.found ? 'found-yes' : 'found-no');
+    div.textContent = gt.found
+      ? `${gt.name}：+${gt.pts}点 ✓`
+      : `${gt.name}：見つからなかった…`;
     bd.appendChild(div);
   }
 
@@ -1151,7 +1431,7 @@ function updateTimerUI() {
 //  INPUT
 // ─────────────────────────────────────────────
 function canvasPos(e) {
-  const rect  = canvas.getBoundingClientRect();
+  const rect   = canvas.getBoundingClientRect();
   const scaleX = W / rect.width;
   const scaleY = H / rect.height;
   let cx, cy;
@@ -1172,48 +1452,27 @@ function handleInput(e) {
   const { x, y } = canvasPos(e);
   let hit = false;
 
-  // Clownfish
-  if (!found.clownfish) {
-    const d2 = dist2(x, y, targets.clownfish.x, targets.clownfish.y);
-    if (d2 < (targets.clownfish.r + 8) ** 2) {
-      found.clownfish = true;
-      score += 20;
-      updateScoreUI();
-      document.getElementById('card-clownfish').classList.add('found');
-      feedbacks.push({ x: targets.clownfish.x, y: targets.clownfish.y - 24,
-        text: '+20点！', color: '#00ffaa', life: 85, maxLife: 85, size: 30 });
-      hit = true;
-      checkAllFound();
-    }
-  }
+  for (let i = 0; i < gameTargets.length; i++) {
+    const gt = gameTargets[i];
+    if (gt.found) continue;
 
-  // Octopus
-  if (!found.octopus && !hit) {
-    const d2 = dist2(x, y, targets.octopus.x, targets.octopus.y);
-    if (d2 < (targets.octopus.r + 8) ** 2) {
-      found.octopus = true;
-      score += 30;
+    const d2 = dist2(x, y, gt.x, gt.y);
+    if (d2 < (gt.hitR + 8) ** 2) {
+      gt.found = true;
+      score += gt.pts;
       updateScoreUI();
-      document.getElementById('card-octopus').classList.add('found');
-      feedbacks.push({ x: targets.octopus.x, y: targets.octopus.y - 24,
-        text: '+30点！', color: '#ffbb00', life: 90, maxLife: 90, size: 32 });
+      document.getElementById('card-' + i).classList.add('found');
+      const col = gt.pts >= 45 ? '#ffd700' : gt.pts >= 30 ? '#ffbb00' : '#00ffaa';
+      feedbacks.push({
+        x: gt.x, y: gt.y - 28,
+        text: `+${gt.pts}点！`,
+        color: col,
+        life: 90, maxLife: 90,
+        size: 26 + Math.floor(gt.pts / 5)
+      });
       hit = true;
       checkAllFound();
-    }
-  }
-
-  // Chest (tight hitbox – intentionally small)
-  if (!found.chest && !hit) {
-    const t = targets.chest;
-    if (Math.abs(x - t.x) < t.hw + 6 && Math.abs(y - t.y) < t.hh + 6) {
-      found.chest = true;
-      score += 50;
-      updateScoreUI();
-      document.getElementById('card-chest').classList.add('found');
-      feedbacks.push({ x: t.x, y: t.y - 30,
-        text: '+50点！', color: '#ffd700', life: 100, maxLife: 100, size: 36 });
-      hit = true;
-      checkAllFound();
+      break;
     }
   }
 
@@ -1223,7 +1482,7 @@ function handleInput(e) {
 }
 
 function checkAllFound() {
-  if (found.clownfish && found.octopus && found.chest) {
+  if (gameTargets.every(gt => gt.found)) {
     setTimeout(endGame, 900);
   }
 }
@@ -1234,6 +1493,7 @@ canvas.addEventListener('touchstart', handleInput, { passive: false });
 // ─────────────────────────────────────────────
 //  BOOT
 // ─────────────────────────────────────────────
+showStartOverlay();   // picks initial 3 targets and shows preview
 initScene();
 requestAnimationFrame(gameLoop);
 </script>
