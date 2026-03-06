@@ -29,35 +29,33 @@ body {
 /* HUD */
 #hud {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 14px;
+  flex-direction: column;
+  padding: 8px 10px 6px;
   background: rgba(0, 20, 50, 0.97);
   border: 2px solid #0077bb;
   border-bottom: none;
   border-radius: 14px 14px 0 0;
   color: white;
-  gap: 10px;
-  flex-wrap: wrap;
+  gap: 6px;
 }
 
 #target-panel {
   display: flex;
-  gap: 8px;
-  flex: 1;
-  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
 }
 
 .target-card {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  padding: 5px 10px;
+  gap: 6px;
+  padding: 5px 8px;
   border-radius: 10px;
   background: rgba(0, 60, 130, 0.45);
   border: 2px solid #0066aa;
-  font-size: 12px;
-  min-width: 72px;
+  flex: 1;
+  min-width: 0;
   transition: all 0.35s ease;
 }
 
@@ -73,18 +71,26 @@ body {
   opacity: 0.6;
 }
 
-.card-thumb { display: block; width: 44px; height: 44px; }
-.card-name { font-weight: bold; font-size: 11px; margin-top: 2px; }
-.card-pts  { color: #ffcc00; font-size: 13px; font-weight: bold; }
-.card-diff { font-size: 10px; color: #99aacc; }
+.card-thumb { display: block; width: 36px; height: 36px; flex-shrink: 0; }
+.card-text  { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.card-name  { font-weight: bold; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-pts   { color: #ffcc00; font-size: 12px; font-weight: bold; }
+.card-diff  { font-size: 10px; color: #99aacc; }
+
+.hud-stats {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  border-top: 1px solid rgba(0,119,187,0.4);
+  padding-top: 4px;
+}
 
 #timer-box {
   text-align: center;
-  min-width: 74px;
 }
 #timer-label { font-size: 10px; color: #99aacc; letter-spacing: 1px; }
 #timer-val {
-  font-size: 34px;
+  font-size: 30px;
   font-weight: 900;
   color: #ffcc00;
   line-height: 1;
@@ -97,12 +103,11 @@ body {
 @keyframes blink { from { opacity: 1; } to { opacity: 0.35; } }
 
 #score-box {
-  text-align: right;
-  min-width: 80px;
+  text-align: center;
 }
 #score-label { font-size: 10px; color: #99aacc; letter-spacing: 1px; }
 #score-val {
-  font-size: 30px;
+  font-size: 28px;
   font-weight: 900;
   color: #00ffcc;
   line-height: 1;
@@ -162,26 +167,26 @@ canvas {
 
 .target-preview {
   display: flex;
-  gap: 12px;
-  margin: 10px 0 18px;
-  flex-wrap: wrap;
+  gap: 10px;
+  margin: 8px 0 16px;
   justify-content: center;
 }
 .preview-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 10px 16px;
+  padding: 10px 12px;
   background: rgba(0, 70, 150, 0.3);
   border: 1px solid #0066aa;
   border-radius: 12px;
-  gap: 4px;
-  min-width: 90px;
+  gap: 5px;
+  flex: 1;
+  max-width: 110px;
 }
-.big-thumb { display: block; width: 64px; height: 64px; }
-.p-name  { font-size: 13px; font-weight: bold; }
-.p-pts   { font-size: 14px; color: #ffcc00; font-weight: bold; }
-.p-diff  { font-size: 11px; color: #99aacc; }
+.big-thumb { display: block; width: 56px; height: 56px; flex-shrink: 0; }
+.p-name  { font-size: 12px; font-weight: bold; text-align: center; }
+.p-pts   { font-size: 13px; color: #ffcc00; font-weight: bold; }
+.p-diff  { font-size: 10px; color: #99aacc; }
 
 .btn {
   padding: 13px 42px;
@@ -230,13 +235,15 @@ canvas {
   <!-- HUD -->
   <div id="hud">
     <div id="target-panel"><!-- built by JS --></div>
-    <div id="timer-box">
-      <div id="timer-label">のこり時間</div>
-      <div id="timer-val">60</div>
-    </div>
-    <div id="score-box">
-      <div id="score-label">スコア</div>
-      <div id="score-val">0</div>
+    <div class="hud-stats">
+      <div id="timer-box">
+        <div id="timer-label">のこり時間</div>
+        <div id="timer-val">60</div>
+      </div>
+      <div id="score-box">
+        <div id="score-label">スコア</div>
+        <div id="score-val">0</div>
+      </div>
     </div>
   </div>
 
@@ -1292,6 +1299,9 @@ function buildHUD() {
     thumbC.width     = 44;
     thumbC.height    = 44;
 
+    const textDiv = document.createElement('div');
+    textDiv.className = 'card-text';
+
     const nameDiv = document.createElement('div');
     nameDiv.className   = 'card-name';
     nameDiv.textContent = gt.name;
@@ -1304,10 +1314,11 @@ function buildHUD() {
     diffDiv.className   = 'card-diff';
     diffDiv.textContent = gt.diff;
 
+    textDiv.appendChild(nameDiv);
+    textDiv.appendChild(ptsDiv);
+    textDiv.appendChild(diffDiv);
     card.appendChild(thumbC);
-    card.appendChild(nameDiv);
-    card.appendChild(ptsDiv);
-    card.appendChild(diffDiv);
+    card.appendChild(textDiv);
     panel.appendChild(card);
 
     drawThumbnail(gt.id, thumbC);
