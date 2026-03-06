@@ -165,28 +165,6 @@ canvas {
   line-height: 1.7;
 }
 
-.target-preview {
-  display: flex;
-  gap: 10px;
-  margin: 8px 0 16px;
-  justify-content: center;
-}
-.preview-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 10px 12px;
-  background: rgba(0, 70, 150, 0.3);
-  border: 1px solid #0066aa;
-  border-radius: 12px;
-  gap: 5px;
-  flex: 1;
-  max-width: 110px;
-}
-.big-thumb { display: block; width: 56px; height: 56px; flex-shrink: 0; }
-.p-name  { font-size: 12px; font-weight: bold; text-align: center; }
-.p-pts   { font-size: 13px; color: #ffcc00; font-weight: bold; }
-.p-diff  { font-size: 10px; color: #99aacc; }
 
 .btn {
   padding: 13px 42px;
@@ -254,8 +232,7 @@ canvas {
     <!-- Start overlay -->
     <div class="overlay" id="start-overlay">
       <h1>🌊 海の宝探し 🌊</h1>
-      <p>海の中にかくれた3つのものを探してタップ！<br>60秒以内にすべて見つけると100点！</p>
-      <div class="target-preview" id="start-preview"><!-- built by JS --></div>
+      <p>上のHUDに探すものが表示されています。<br>60秒以内に全部見つけよう！</p>
       <button class="btn" onclick="startGame()">ゲームスタート！</button>
     </div>
 
@@ -1325,39 +1302,6 @@ function buildHUD() {
   }
 }
 
-function buildStartPreview() {
-  const preview = document.getElementById('start-preview');
-  preview.innerHTML = '';
-  for (const gt of gameTargets) {
-    const item = document.createElement('div');
-    item.className = 'preview-item';
-
-    const thumbC = document.createElement('canvas');
-    thumbC.className = 'big-thumb';
-    thumbC.width     = 64;
-    thumbC.height    = 64;
-
-    const nameDiv = document.createElement('div');
-    nameDiv.className   = 'p-name';
-    nameDiv.textContent = gt.name;
-
-    const ptsDiv = document.createElement('div');
-    ptsDiv.className   = 'p-pts';
-    ptsDiv.textContent = gt.pts + '点';
-
-    const diffDiv = document.createElement('div');
-    diffDiv.className   = 'p-diff';
-    diffDiv.textContent = gt.diff;
-
-    item.appendChild(thumbC);
-    item.appendChild(nameDiv);
-    item.appendChild(ptsDiv);
-    item.appendChild(diffDiv);
-    preview.appendChild(item);
-
-    drawThumbnail(gt.id, thumbC);
-  }
-}
 
 // ─────────────────────────────────────────────
 //  GAME CONTROL
@@ -1370,7 +1314,6 @@ function showStartOverlay() {
 
   gameTargets = pickRandom3().map(c => ({ ...c, found: false, x: 0, y: 0 }));
   buildHUD();
-  buildStartPreview();
 
   document.getElementById('start-overlay').classList.remove('hidden');
   document.getElementById('end-overlay').classList.add('hidden');
