@@ -508,18 +508,18 @@ function initBgObjects() {
 
   // ── 沈没船（常に1隻・大きめ）────────────────────────
   {
-    const sx  = rnd(160, W - 160);
-    const sc  = rnd(0.88, 1.08);
+    const sx  = rnd(220, W - 220);
+    const sc  = rnd(0.88, 1.02);
     const fl  = Math.random() < 0.5;
     const fs  = fl ? -1 : 1;
-    const HW  = 145, HH = 62;         // ★ 大きい船体
-    const phR = 26 * sc;              // 舷窓クリップ半径（ワールド座標）
+    const HW  = 200, HH = 92;         // ★★ さらに大きい船体
+    const phR = 32 * sc;              // 舷窓クリップ半径（ワールド座標）
     const phY = SAND_Y - HH * 0.72 * sc;
     bgObjects.push({
       type : 'shipwreck',
       x: sx, y: SAND_Y, scale: sc, flip: fl,
-      algae: Array.from({ length: 11 }, () => ({
-        dx: rnd(-55, 55), dy: rnd(-45, -8),
+      algae: Array.from({ length: 13 }, () => ({
+        dx: rnd(-70, 70), dy: rnd(-60, -8),
         angle: rnd(0, Math.PI), ci: rndInt(0, 3)
       })),
       slots: [
@@ -659,38 +659,38 @@ function drawShipwreck(obj) {
   ctx.translate(x, y);
   if (flip) ctx.scale(-1, 1);
   ctx.scale(sc, sc);
-  const HW = 145, HH = 62;           // ★ 大きい船体
+  const HW = 200, HH = 92;           // ★★ 大型船体
 
   // 影
   ctx.save();
   ctx.globalAlpha = 0.22;
   ctx.fillStyle   = '#000';
   ctx.beginPath();
-  ctx.ellipse(5, 18, HW * 0.55, 16, 0, 0, Math.PI * 2);
+  ctx.ellipse(6, 22, HW * 0.55, 18, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
   // 船体
   ctx.beginPath();
   ctx.moveTo(-HW, -HH * 0.5);
-  ctx.quadraticCurveTo(-HW - 8, 0, -HW + 22, 0);
-  ctx.lineTo(HW - 22, 0);
-  ctx.quadraticCurveTo(HW + 8, 0, HW, -HH * 0.5);
+  ctx.quadraticCurveTo(-HW - 10, 0, -HW + 28, 0);
+  ctx.lineTo(HW - 28, 0);
+  ctx.quadraticCurveTo(HW + 10, 0, HW, -HH * 0.5);
   ctx.lineTo(HW * 0.68, -HH);
   ctx.lineTo(-HW * 0.68, -HH);
   ctx.closePath();
   ctx.fillStyle   = '#5c3518';
   ctx.fill();
   ctx.strokeStyle = '#3a2008';
-  ctx.lineWidth   = 2.5;
+  ctx.lineWidth   = 3;
   ctx.stroke();
 
   // 木の板目
   ctx.strokeStyle = 'rgba(30,12,2,0.35)';
-  ctx.lineWidth   = 1.8;
-  for (let i = 1; i <= 4; i++) {
-    const py = -HH * 0.5 + i * (HH * 0.5 / 4.5);
-    const sh = i * 6;
+  ctx.lineWidth   = 2;
+  for (let i = 1; i <= 5; i++) {
+    const py = -HH * 0.5 + i * (HH * 0.5 / 5.5);
+    const sh = i * 7;
     ctx.beginPath();
     ctx.moveTo(-HW + sh, py);
     ctx.lineTo( HW - sh, py);
@@ -702,44 +702,43 @@ function drawShipwreck(obj) {
   ctx.moveTo(-HW * 0.68, -HH);
   ctx.lineTo( HW * 0.68, -HH);
   ctx.strokeStyle = '#3a2008';
-  ctx.lineWidth   = 4;
+  ctx.lineWidth   = 5;
   ctx.stroke();
 
   // 折れたマスト
   ctx.beginPath();
   ctx.moveTo(-HW * 0.12, -HH);
-  ctx.lineTo(-HW * 0.12 + 14, -HH - 95);
+  ctx.lineTo(-HW * 0.12 + 18, -HH - 130);
   ctx.strokeStyle = '#4a2810';
-  ctx.lineWidth   = 8;
+  ctx.lineWidth   = 11;
   ctx.lineCap     = 'round';
   ctx.stroke();
   // 横桁（折れた）
   ctx.beginPath();
-  ctx.moveTo(-HW * 0.12 + 6,  -HH - 62);
-  ctx.lineTo(-HW * 0.12 + 62, -HH - 34);
-  ctx.lineWidth = 5.5;
+  ctx.moveTo(-HW * 0.12 + 8,  -HH - 86);
+  ctx.lineTo(-HW * 0.12 + 88, -HH - 48);
+  ctx.lineWidth = 7;
   ctx.stroke();
 
   // 破れた帆
   ctx.beginPath();
-  ctx.moveTo(-HW * 0.12 + 6,  -HH - 62);
-  ctx.lineTo(-HW * 0.12 + 58, -HH - 29);
-  ctx.lineTo(-HW * 0.12 + 42, -HH - 16);
-  ctx.lineTo(-HW * 0.12 + 2,  -HH - 32);
+  ctx.moveTo(-HW * 0.12 + 8,  -HH - 86);
+  ctx.lineTo(-HW * 0.12 + 82, -HH - 42);
+  ctx.lineTo(-HW * 0.12 + 60, -HH - 22);
+  ctx.lineTo(-HW * 0.12 + 2,  -HH - 46);
   ctx.closePath();
   ctx.fillStyle = 'rgba(190,170,125,0.38)';
   ctx.fill();
 
-  // 舷窓の暗い内部（リングは overlay で上書き）
-  // ★ 半径26に拡大
+  // 舷窓の暗い内部（リングは overlay で上書き）★ 半径32
   for (const [phx, phy] of [[-HW * 0.42, -HH * 0.72], [HW * 0.20, -HH * 0.72]]) {
     ctx.beginPath();
-    ctx.arc(phx, phy, 26, 0, Math.PI * 2);
+    ctx.arc(phx, phy, 32, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(0,5,25,0.88)';
     ctx.fill();
     // ガラスの青みがかった反射
     ctx.beginPath();
-    ctx.arc(phx, phy, 26, 0, Math.PI * 2);
+    ctx.arc(phx, phy, 32, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(30,80,160,0.12)';
     ctx.fill();
   }
@@ -764,49 +763,49 @@ function drawShipwreckOverlay(obj) {
   ctx.translate(x, y);
   if (flip) ctx.scale(-1, 1);
   ctx.scale(sc, sc);
-  const HW = 145, HH = 62;            // ★ 大きい船体に合わせる
+  const HW = 200, HH = 92;            // ★★ 大型船体に合わせる
   for (const [phx, phy] of [[-HW * 0.42, -HH * 0.72], [HW * 0.20, -HH * 0.72]]) {
-    // 外リング（太い真鍮フレーム）★ 半径30
+    // 外リング（太い真鍮フレーム）★ 半径36
     ctx.beginPath();
-    ctx.arc(phx, phy, 30, 0, Math.PI * 2);
+    ctx.arc(phx, phy, 36, 0, Math.PI * 2);
     ctx.strokeStyle = '#7a4820';
-    ctx.lineWidth   = 8;
+    ctx.lineWidth   = 9;
     ctx.stroke();
     // 内縁（締め金リング）
     ctx.beginPath();
-    ctx.arc(phx, phy, 26, 0, Math.PI * 2);
+    ctx.arc(phx, phy, 32, 0, Math.PI * 2);
     ctx.strokeStyle = '#9a6030';
-    ctx.lineWidth   = 2;
+    ctx.lineWidth   = 2.5;
     ctx.stroke();
     // クロスバー（舷窓らしさを演出）
     ctx.save();
     ctx.globalAlpha = 0.55;
     ctx.strokeStyle = '#8a5228';
-    ctx.lineWidth   = 3;
+    ctx.lineWidth   = 3.5;
     ctx.lineCap     = 'round';
     ctx.beginPath();
-    ctx.moveTo(phx - 26, phy);
-    ctx.lineTo(phx + 26, phy);
+    ctx.moveTo(phx - 32, phy);
+    ctx.lineTo(phx + 32, phy);
     ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(phx, phy - 26);
-    ctx.lineTo(phx, phy + 26);
+    ctx.moveTo(phx, phy - 32);
+    ctx.lineTo(phx, phy + 32);
     ctx.stroke();
     ctx.restore();
     // ガラス反射ハイライト（左上の弧）
     ctx.save();
     ctx.globalAlpha = 0.35;
     ctx.beginPath();
-    ctx.arc(phx - 8, phy - 8, 12, Math.PI * 1.0, Math.PI * 1.55);
+    ctx.arc(phx - 10, phy - 10, 15, Math.PI * 1.0, Math.PI * 1.55);
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth   = 2.5;
+    ctx.lineWidth   = 3;
     ctx.stroke();
     ctx.restore();
     // リベット（8個）
     for (let ri = 0; ri < 8; ri++) {
       const ra = ri * Math.PI / 4;
       ctx.beginPath();
-      ctx.arc(phx + Math.cos(ra) * 30, phy + Math.sin(ra) * 30, 2.8, 0, Math.PI * 2);
+      ctx.arc(phx + Math.cos(ra) * 36, phy + Math.sin(ra) * 36, 3.5, 0, Math.PI * 2);
       ctx.fillStyle = '#6a3810';
       ctx.fill();
     }
