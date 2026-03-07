@@ -304,6 +304,7 @@ let rocks     = [];
 let distFish  = [];
 let bubbles   = [];
 let jellyfish = [];
+let bgObjects = [];   // 背景装飾オブジェクト（沈没船・珊瑚岩・錨・大ハマグリ）
 
 // ─────────────────────────────────────────────
 //  UTILS
@@ -429,6 +430,9 @@ function initScene() {
   bubbles = [];
   for (let i = 0; i < 35; i++) bubbles.push(makeBubble());
 
+  // 背景オブジェクト（先に配置してからターゲットを乗せる）
+  initBgObjects();
+
   // Place targets
   placeTargets();
 }
@@ -460,18 +464,115 @@ function placeTargets() {
         gt.y = SAND_Y + rnd(6, 18);
         break;
     }
+    gt.inShip = false;
   }
-  // Enforce minimum separation
+
+  // 船のスロット（舷窓・甲板）にランダムで1体配置
+  const ships = bgObjects.filter(o => o.type === 'shipwreck');
+  if (ships.length > 0 && Math.random() < 0.75) {
+    const ship  = ships[rndInt(0, ships.length)];
+    const slot  = ship.slots[rndInt(0, ship.slots.length)];
+    const gt    = gameTargets[rndInt(0, gameTargets.length)];
+    gt.x        = slot.wx;
+    gt.y        = slot.wy;
+    gt.inShip   = true;
+    gt.slotType = slot.type;
+    gt.portholeR = slot.portholeR;          // 舷窓クリップ半径（甲板はundefined）
+    if (slot.type === 'porthole') {
+      gt.hitR = Math.max(gt.hitR, Math.round(slot.portholeR)); // 舷窓全体をクリック可能に
+    }
+  }
+
+  // Enforce minimum separation（船配置のターゲットは除外）
   const minD2 = 130 * 130;
   for (let iter = 0; iter < 10; iter++) {
     for (let a = 0; a < gameTargets.length; a++) {
       for (let b = a + 1; b < gameTargets.length; b++) {
         const ga = gameTargets[a], gb = gameTargets[b];
+        if (gb.inShip) continue;
         if (dist2(ga.x, ga.y, gb.x, gb.y) < minD2) {
           gb.x = Math.max(60, Math.min(W - 60, gb.x + 50));
         }
       }
     }
+  }
+}
+
+// ─────────────────────────────────────────────
+//  BACKGROUND SCENE OBJECTS  (沈没船・珊瑚岩・錨・大ハマグリ)
+// ─────────────────────────────────────────────
+
+function initBgObjects() {
+  bgObjects = [];
+  const coralCols = ['#ff6688','#ff3355','#ff8844','#cc4499','#ff44aa','#ff6622','#ff2266'];
+
+  // ── 沈没船（1〜2隻）──────────────────────────────
+  const ns = rndInt(1, 3);
+  for (let i = 0; i < ns; i++) {
+    const sx  = rnd(140, W - 140);
+    const sc  = rnd(0.82, 1.15);
+    const fl  = Math.random() < 0.5;
+    const fs  = fl ? -1 : 1;
+    const HW  = 105, HH = 42;
+    const phR = 18 * sc;           // 舷窓クリップ半径（ワールド座標）
+    const phY = SAND_Y - HH * 0.72 * sc;
+    bgObjects.push({
+      type : 'shipwreck',
+      x: sx, y: SAND_Y, scale: sc, flip: fl,
+      algae: Array.from({ length: 9 }, () => ({
+        dx: rnd(-40, 40), dy: rnd(-30, -8),
+        angle: rnd(0, Math.PI), ci: rndInt(0, 3)
+      })),
+      slots: [
+        // 舷窓1（左）
+        { type: 'porthole', portholeR: phR,
+          wx: sx + fs * (-HW * 0.42) * sc, wy: phY },
+        // 舷窓2（右）
+        { type: 'porthole', portholeR: phR,
+          wx: sx + fs * ( HW * 0.20) * sc, wy: phY },
+        // 甲板
+        { type: 'deck', portholeR: undefined,
+          wx: sx, wy: SAND_Y - (HH + 6) * sc }
+      ]
+    });
+  }
+
+  // ── 珊瑚がついた大岩（2〜4個）────────────────────
+  const nc = rndInt(2, 5);
+  for (let i = 0; i < nc; i++) {
+    const rg = rndInt(60, 105);
+    bgObjects.push({
+      type: 'coralRock',
+      x: rnd(40, W - 40), y: SAND_Y,
+      scale: rnd(0.6, 1.2),
+      rockColor: `rgb(${rg},${rg},${rg + rndInt(5, 20)})`,
+      branches: Array.from({ length: rndInt(2, 5) }, () => ({
+        dx   : rnd(-35, 35),
+        tilt : rnd(-0.4, 0.4),
+        len  : rnd(18, 32),
+        depth: rndInt(3, 5),
+        color: coralCols[rndInt(0, coralCols.length)]
+      }))
+    });
+  }
+
+  // ── 錨（0〜1個）──────────────────────────────────
+  if (Math.random() < 0.65) {
+    bgObjects.push({
+      type: 'anchor',
+      x: rnd(70, W - 70), y: SAND_Y,
+      scale: rnd(0.7, 1.05), angle: rnd(-0.22, 0.22)
+    });
+  }
+
+  // ── 大ハマグリ（2〜4個）──────────────────────────
+  const ncl = rndInt(2, 5);
+  for (let i = 0; i < ncl; i++) {
+    bgObjects.push({
+      type: 'clam',
+      x: rnd(30, W - 30), y: SAND_Y,
+      scale: rnd(0.6, 1.05), open: rnd(0.1, 0.38)
+    });
   }
 }
 
@@ -529,6 +630,359 @@ function drawBackground() {
     ctx.arc(sx, sy, 1.4, 0, Math.PI * 2);
     ctx.fill();
   }
+  ctx.restore();
+}
+
+// ─── 珊瑚の枝（再帰） ───────────────────────────────────────────────────────
+function drawBranchCoral(x, y, len, angle, depth, color) {
+  if (depth <= 0 || len < 5) return;
+  const ex = x + Math.cos(angle) * len;
+  const ey = y + Math.sin(angle) * len;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(ex, ey);
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = Math.max(1.2, depth * 1.5);
+  ctx.lineCap     = 'round';
+  ctx.stroke();
+  if (depth === 1) {
+    ctx.beginPath();
+    ctx.arc(ex, ey, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+  drawBranchCoral(ex, ey, len * 0.68, angle - 0.48, depth - 1, color);
+  drawBranchCoral(ex, ey, len * 0.65, angle + 0.42, depth - 1, color);
+}
+
+// ─── 沈没船ボディ ────────────────────────────────────────────────────────────
+function drawShipwreck(obj) {
+  const { x, y, scale: sc, flip, algae } = obj;
+  ctx.save();
+  ctx.translate(x, y);
+  if (flip) ctx.scale(-1, 1);
+  ctx.scale(sc, sc);
+  const HW = 105, HH = 42;
+
+  // 影
+  ctx.save();
+  ctx.globalAlpha = 0.22;
+  ctx.fillStyle   = '#000';
+  ctx.beginPath();
+  ctx.ellipse(4, 14, HW * 0.55, 14, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 船体
+  ctx.beginPath();
+  ctx.moveTo(-HW, -HH * 0.5);
+  ctx.quadraticCurveTo(-HW - 6, 0, -HW + 18, 0);
+  ctx.lineTo(HW - 18, 0);
+  ctx.quadraticCurveTo(HW + 6, 0, HW, -HH * 0.5);
+  ctx.lineTo(HW * 0.68, -HH);
+  ctx.lineTo(-HW * 0.68, -HH);
+  ctx.closePath();
+  ctx.fillStyle   = '#5c3518';
+  ctx.fill();
+  ctx.strokeStyle = '#3a2008';
+  ctx.lineWidth   = 2;
+  ctx.stroke();
+
+  // 木の板目
+  ctx.strokeStyle = 'rgba(30,12,2,0.35)';
+  ctx.lineWidth   = 1.5;
+  for (let i = 1; i <= 3; i++) {
+    const py = -HH * 0.5 + i * (HH * 0.5 / 3.5);
+    const sh = i * 5;
+    ctx.beginPath();
+    ctx.moveTo(-HW + sh, py);
+    ctx.lineTo( HW - sh, py);
+    ctx.stroke();
+  }
+
+  // 甲板縁
+  ctx.beginPath();
+  ctx.moveTo(-HW * 0.68, -HH);
+  ctx.lineTo( HW * 0.68, -HH);
+  ctx.strokeStyle = '#3a2008';
+  ctx.lineWidth   = 3;
+  ctx.stroke();
+
+  // 折れたマスト
+  ctx.beginPath();
+  ctx.moveTo(-HW * 0.12, -HH);
+  ctx.lineTo(-HW * 0.12 + 12, -HH - 80);
+  ctx.strokeStyle = '#4a2810';
+  ctx.lineWidth   = 7;
+  ctx.lineCap     = 'round';
+  ctx.stroke();
+  // 横桁（折れた）
+  ctx.beginPath();
+  ctx.moveTo(-HW * 0.12 + 5,  -HH - 52);
+  ctx.lineTo(-HW * 0.12 + 52, -HH - 28);
+  ctx.lineWidth = 4.5;
+  ctx.stroke();
+
+  // 破れた帆
+  ctx.beginPath();
+  ctx.moveTo(-HW * 0.12 + 5,  -HH - 52);
+  ctx.lineTo(-HW * 0.12 + 48, -HH - 24);
+  ctx.lineTo(-HW * 0.12 + 36, -HH - 14);
+  ctx.lineTo(-HW * 0.12 + 2,  -HH - 26);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(190,170,125,0.38)';
+  ctx.fill();
+
+  // 舷窓の暗い内部（リングは overlay で上書き）
+  for (const [phx, phy] of [[-HW * 0.42, -HH * 0.72], [HW * 0.20, -HH * 0.72]]) {
+    ctx.beginPath();
+    ctx.arc(phx, phy, 18, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,5,25,0.85)';
+    ctx.fill();
+  }
+
+  // 藻・フジツボ（事前生成済み）
+  const algCols = ['#1a7a2a', '#2a9a3a', '#0a6a1a'];
+  ctx.globalAlpha = 0.6;
+  for (const a of algae) {
+    ctx.beginPath();
+    ctx.ellipse(a.dx, a.dy, 4.5, 7.5, a.angle, 0, Math.PI * 2);
+    ctx.fillStyle = algCols[a.ci];
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+// 舷窓の真鍮リング（ターゲット生物の上に重ねる）
+function drawShipwreckOverlay(obj) {
+  const { x, y, scale: sc, flip } = obj;
+  ctx.save();
+  ctx.translate(x, y);
+  if (flip) ctx.scale(-1, 1);
+  ctx.scale(sc, sc);
+  const HW = 105, HH = 42;
+  for (const [phx, phy] of [[-HW * 0.42, -HH * 0.72], [HW * 0.20, -HH * 0.72]]) {
+    // 外リング（真鍮色）
+    ctx.beginPath();
+    ctx.arc(phx, phy, 20, 0, Math.PI * 2);
+    ctx.strokeStyle = '#8a5030';
+    ctx.lineWidth   = 5;
+    ctx.stroke();
+    // 内リング（締め金）
+    ctx.beginPath();
+    ctx.arc(phx, phy, 18, 0, Math.PI * 2);
+    ctx.strokeStyle = '#6a3818';
+    ctx.lineWidth   = 1.5;
+    ctx.stroke();
+    // リベット
+    for (let ri = 0; ri < 4; ri++) {
+      const ra = ri * Math.PI / 2 + Math.PI / 4;
+      ctx.beginPath();
+      ctx.arc(phx + Math.cos(ra) * 20, phy + Math.sin(ra) * 20, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#7a4020';
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+// ─── 珊瑚岩 ────────────────────────────────────────────────────────────────
+function drawCoralRock(obj) {
+  const { x, y, scale: sc, rockColor, branches } = obj;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(sc, sc);
+
+  // 影
+  ctx.save();
+  ctx.globalAlpha = 0.2;
+  ctx.fillStyle   = '#000';
+  ctx.beginPath();
+  ctx.ellipse(3, 10, 52, 14, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 岩本体
+  ctx.beginPath();
+  ctx.ellipse(0, -8, 52, 28, 0, 0, Math.PI * 2);
+  ctx.fillStyle   = rockColor;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+  ctx.lineWidth   = 1.5;
+  ctx.stroke();
+
+  // ハイライト
+  ctx.save();
+  ctx.globalAlpha = 0.14;
+  ctx.fillStyle   = '#fff';
+  ctx.beginPath();
+  ctx.ellipse(-15, -16, 22, 10, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 珊瑚の枝
+  for (const b of branches) {
+    drawBranchCoral(b.dx, -34, b.len, -Math.PI / 2 + b.tilt, b.depth, b.color);
+  }
+  ctx.restore();
+}
+
+// ─── 錨 ────────────────────────────────────────────────────────────────────
+function drawAnchor(obj) {
+  const { x, y, scale: sc, angle } = obj;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.scale(sc, sc);
+  const r   = 24;
+  const col = '#5a6870';
+
+  // チェーン
+  ctx.save();
+  ctx.globalAlpha = 0.65;
+  for (let i = 0; i < 5; i++) {
+    ctx.beginPath();
+    ctx.ellipse(i * 3, -r - 18 - i * 9, 5, 3.5, (i % 2) * Math.PI / 2, 0, Math.PI * 2);
+    ctx.strokeStyle = '#778890';
+    ctx.lineWidth   = 2.5;
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // 上部リング
+  ctx.beginPath();
+  ctx.arc(0, -r - 10, 9, 0, Math.PI * 2);
+  ctx.strokeStyle = col;
+  ctx.lineWidth   = 4.5;
+  ctx.stroke();
+
+  // 横棒
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.75, -r + 6);
+  ctx.lineTo( r * 0.75, -r + 6);
+  ctx.strokeStyle = col;
+  ctx.lineWidth   = 5;
+  ctx.lineCap     = 'round';
+  ctx.stroke();
+
+  // シャフト
+  ctx.beginPath();
+  ctx.moveTo(0, -r + 6);
+  ctx.lineTo(0,  r);
+  ctx.lineWidth = 5;
+  ctx.stroke();
+
+  // フルーク（爪）
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(0, r);
+    ctx.bezierCurveTo(side * r * 0.4, r * 0.85, side * r * 0.82, r * 0.5, side * r * 0.8, r * 0.1);
+    ctx.lineWidth = 4.5;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(side * r * 0.8, r * 0.1, 5.5, 0, Math.PI * 2);
+    ctx.fillStyle = col;
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// ─── 大ハマグリ ──────────────────────────────────────────────────────────────
+function drawGiantClam(obj) {
+  const { x, y, scale: sc, open } = obj;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(sc, sc);
+  const rx = 32, ry = 14;
+
+  // 影
+  ctx.save();
+  ctx.globalAlpha = 0.18;
+  ctx.fillStyle   = '#000';
+  ctx.beginPath();
+  ctx.ellipse(2, 8, rx * 0.6, 9, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 下殻
+  ctx.beginPath();
+  ctx.ellipse(0, 0, rx, ry * 0.55, 0, 0, Math.PI * 2);
+  ctx.fillStyle   = '#c4aa72';
+  ctx.fill();
+  ctx.strokeStyle = '#906a30';
+  ctx.lineWidth   = 1.5;
+  ctx.stroke();
+
+  // 上殻ドーム（少し開いている）
+  ctx.save();
+  ctx.rotate(-open);
+  ctx.beginPath();
+  ctx.moveTo(-rx, 0);
+  ctx.bezierCurveTo(-rx * 1.05, -ry * 2.2, rx * 1.05, -ry * 2.2, rx, 0);
+  ctx.closePath();
+  ctx.fillStyle   = '#b89a60';
+  ctx.fill();
+  ctx.strokeStyle = '#906a30';
+  ctx.lineWidth   = 1.5;
+  ctx.stroke();
+  // リブ（筋）
+  ctx.strokeStyle = 'rgba(90,60,20,0.25)';
+  ctx.lineWidth   = 1.2;
+  for (let bx = -rx + 7; bx < rx; bx += 7) {
+    ctx.beginPath();
+    ctx.moveTo(bx, 0);
+    const ph = -ry * 2.15 * Math.sqrt(Math.max(0, 1 - (bx / rx) ** 2));
+    ctx.quadraticCurveTo(bx + 2, ph * 0.5, bx + 2, ph);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // 外套膜（紫色の内部）
+  ctx.save();
+  ctx.globalAlpha = 0.72;
+  ctx.beginPath();
+  ctx.ellipse(0, -3, rx * 0.55, ry * 0.55, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#c888e8';
+  ctx.fill();
+  ctx.restore();
+
+  ctx.restore();
+}
+
+// ─── 背景オブジェクト一括描画（seaweed の前に呼ぶ）──────────────────────────
+function drawBgObjects() {
+  for (const obj of bgObjects) {
+    switch (obj.type) {
+      case 'shipwreck': drawShipwreck(obj);  break;
+      case 'coralRock': drawCoralRock(obj);  break;
+      case 'anchor':    drawAnchor(obj);     break;
+      case 'clam':      drawGiantClam(obj);  break;
+    }
+  }
+}
+
+// 舷窓リングをターゲット生物の上に重ねる
+function drawBgObjectsOverlay() {
+  for (const obj of bgObjects) {
+    if (obj.type === 'shipwreck') drawShipwreckOverlay(obj);
+  }
+}
+
+// 舷窓内にクリップして生物を描画
+function drawCreatureInPorthole(gt, t) {
+  const cr = gt.portholeR;
+  ctx.save();
+  // 舷窓円でクリップ
+  ctx.beginPath();
+  ctx.arc(gt.x, gt.y, cr, 0, Math.PI * 2);
+  ctx.clip();
+  // 生物を舷窓内に収まるよう縮小
+  const fitScale = Math.min(1.0, (cr * 1.05) / gt.hitR);
+  ctx.translate(gt.x, gt.y);
+  ctx.scale(fitScale, fitScale);
+  ctx.translate(-gt.x, -gt.y);
+  drawCreatureAt(gt.id, ctx, gt.x, gt.y, t, gt.found);
   ctx.restore();
 }
 
@@ -1229,21 +1683,38 @@ function update() {
 function render() {
   ctx.clearRect(0, 0, W, H);
   drawBackground();
-  for (const r of rocks)     drawRock(r);
+  for (const r of rocks) drawRock(r);
+
+  // 背景オブジェクト（岩の上、海草の後ろ）
+  drawBgObjects();
+
   for (const sw of seaweeds) drawSeaweed(sw);
   for (const jf of jellyfish) drawJellyfish(jf);
   for (const f of distFish)  drawFish(f);
 
   const t = performance.now() * 0.001;
 
-  // Draw targets in depth order: sand first, then bottom, then water
+  // 通常ターゲット（奥から順: sand → bottom → water）
   for (const zone of ['sand', 'bottom', 'water']) {
     for (const gt of gameTargets) {
-      if (gt.zone === zone) {
+      if (!gt.inShip && gt.zone === zone) {
         drawCreatureAt(gt.id, ctx, gt.x, gt.y, t, gt.found);
       }
     }
   }
+
+  // 船内ターゲット（舷窓クリップ or 甲板に素描画）
+  for (const gt of gameTargets) {
+    if (!gt.inShip) continue;
+    if (gt.slotType === 'porthole') {
+      drawCreatureInPorthole(gt, t);
+    } else {
+      drawCreatureAt(gt.id, ctx, gt.x, gt.y, t, gt.found);
+    }
+  }
+
+  // 舷窓の真鍮リングをターゲットの上に重ねる
+  drawBgObjectsOverlay();
 
   for (const b of bubbles) drawBubble(b);
   drawRipples();
